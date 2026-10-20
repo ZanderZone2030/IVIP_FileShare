@@ -1,0 +1,348 @@
+﻿SAMAccountName;DepartmentName;FullPath;LocationCode
+fin.user01;Controlling;Company X\Finance\Controlling;CH1
+fin.user02;Controlling;Company X\Finance\Controlling;CH1
+fin.user03;Controlling;Company X\Finance\Controlling;CH1
+fin.user04;Controlling;Company X\Finance\Controlling;CH1
+fin.user05;Controlling;Company X\Finance\Controlling;CH1
+fin.user06;Controlling;Company X\Finance\Controlling;CH1
+fin.user07;Controlling;Company X\Finance\Controlling;CH1
+fin.user08;Controlling;Company X\Finance\Controlling;CH1
+fin.user09;Controlling;Company X\Finance\Controlling;CH1
+fin.user10;Controlling;Company X\Finance\Controlling;CH1
+fin.user11;Controlling;Company X\Finance\Controlling;CH1
+fin.user12;Controlling;Company X\Finance\Controlling;CH1
+fin.user13;Controlling;Company X\Finance\Controlling;CH1
+fin.user14;Controlling;Company X\Finance\Controlling;CH1
+fin.user15;Controlling;Company X\Finance\Controlling;CH1
+fin.user16;Controlling;Company X\Finance\Controlling;CH1
+fin.user17;Controlling;Company X\Finance\Controlling;CH1
+fin.user18;Controlling;Company X\Finance\Controlling;CH1
+fin.user19;Controlling;Company X\Finance\Controlling;CH1
+fin.user20;Controlling;Company X\Finance\Controlling;CH1
+fin.user21;Accounting;Company X\Finance\Accounting;ES1
+fin.user22;Accounting;Company X\Finance\Accounting;ES1
+fin.user23;Accounting;Company X\Finance\Accounting;ES1
+fin.user24;Accounting;Company X\Finance\Accounting;ES1
+fin.user25;Accounting;Company X\Finance\Accounting;ES1
+fin.user26;Accounting;Company X\Finance\Accounting;ES1
+fin.user27;Accounting;Company X\Finance\Accounting;ES1
+fin.user28;Accounting;Company X\Finance\Accounting;ES1
+fin.user29;Accounting;Company X\Finance\Accounting;ES1
+fin.user30;Accounting;Company X\Finance\Accounting;ES1
+fin.user31;Accounting;Company X\Finance\Accounting;ES1
+fin.user32;Accounting;Company X\Finance\Accounting;ES1
+fin.user33;Accounting;Company X\Finance\Accounting;ES1
+fin.user34;Accounting;Company X\Finance\Accounting;ES1
+fin.user35;Accounting;Company X\Finance\Accounting;ES1
+fin.user36;Accounting;Company X\Finance\Accounting;ES1
+fin.user37;Accounting;Company X\Finance\Accounting;ES1
+fin.user38;Accounting;Company X\Finance\Accounting;ES1
+fin.user39;Accounting;Company X\Finance\Accounting;ES1
+fin.user40;Accounting;Company X\Finance\Accounting;ES1
+hr-lead;HR Operations;Company X\Human Resources\HR Operations;CH1
+hr.user1;HR Operations;Company X\Human Resources\HR Operations;CH1
+hr.user2;HR Operations;Company X\Human Resources\HR Operations;CH1
+hr.user3;HR Operations;Company X\Human Resources\HR Operations;CH1
+CORP\hr.user4;Payroll;Company X\Human Resources\Payroll;ES1
+hr.user5;Payroll;Company X\Human Resources\Payroll;ES1
+hr.user6;Payroll;Company X\Human Resources\Payroll;ES1
+adm.1;Infrastructure;Company X\IT\Infrastructure;CH1
+adm.2;Infrastructure;Company X\IT\Infrastructure;CH1
+adm.3;Infrastructure;Company X\IT\Infrastructure;CH1
+jdoe@corp.local;Infrastructure;Company X\IT\Infrastructure;CH1
+intern1;Controlling;Company X\Finance\Controlling;CH1
+intern2;Controlling;Company X\Finance\Controlling;CH1
+intern3;Controlling;Company X\Finance\Controlling;CH1
+intern4;Graduate Program;Company X\People\Graduate Program;DE1
+intern5;Graduate Program;Company X\People\Graduate Program;DE1
+old.user;Accounting;Company X\Finance\Accounting;ES1
+ext.anna;Controlling;Company X\Finance\Controlling;CH1
+user001;Sales Spain;Company X\Sales\Sales Spain;ES1
+user002;Logistics;Company X\Operations\Logistics;DE1
+user003;Marketing;Company X\Marketing;CH1
+user004;Customer Service;Company X\Operations\Customer Service;ES1
+user005;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user006;Sales Spain;Company X\Sales\Sales Spain;ES1
+user007;Logistics;Company X\Operations\Logistics;DE1
+user008;Marketing;Company X\Marketing;CH1
+user009;Customer Service;Company X\Operations\Customer Service;ES1
+user010;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user011;Sales Spain;Company X\Sales\Sales Spain;ES1
+user012;Logistics;Company X\Operations\Logistics;DE1
+user013;Marketing;Company X\Marketing;CH1
+user014;Customer Service;Company X\Operations\Customer Service;ES1
+user015;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user016;Sales Spain;Company X\Sales\Sales Spain;ES1
+user017;Logistics;Company X\Operations\Logistics;DE1
+user018;Marketing;Company X\Marketing;CH1
+user019;Customer Service;Company X\Operations\Customer Service;ES1
+user020;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user021;Sales Spain;Company X\Sales\Sales Spain;ES1
+user022;Logistics;Company X\Operations\Logistics;DE1
+user023;Marketing;Company X\Marketing;CH1
+user024;Customer Service;Company X\Operations\Customer Service;ES1
+user025;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user026;Sales Spain;Company X\Sales\Sales Spain;ES1
+user027;Logistics;Company X\Operations\Logistics;DE1
+user028;Marketing;Company X\Marketing;CH1
+user029;Customer Service;Company X\Operations\Customer Service;ES1
+user030;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user031;Sales Spain;Company X\Sales\Sales Spain;ES1
+user032;Logistics;Company X\Operations\Logistics;DE1
+user033;Marketing;Company X\Marketing;CH1
+user034;Customer Service;Company X\Operations\Customer Service;ES1
+user035;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user036;Sales Spain;Company X\Sales\Sales Spain;ES1
+user037;Logistics;Company X\Operations\Logistics;DE1
+user038;Marketing;Company X\Marketing;CH1
+user039;Customer Service;Company X\Operations\Customer Service;ES1
+user040;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user041;Sales Spain;Company X\Sales\Sales Spain;ES1
+user042;Logistics;Company X\Operations\Logistics;DE1
+user043;Marketing;Company X\Marketing;CH1
+user044;Customer Service;Company X\Operations\Customer Service;ES1
+user045;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user046;Sales Spain;Company X\Sales\Sales Spain;ES1
+user047;Logistics;Company X\Operations\Logistics;DE1
+user048;Marketing;Company X\Marketing;CH1
+user049;Customer Service;Company X\Operations\Customer Service;ES1
+user050;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user051;Sales Spain;Company X\Sales\Sales Spain;ES1
+user052;Logistics;Company X\Operations\Logistics;DE1
+user053;Marketing;Company X\Marketing;CH1
+user054;Customer Service;Company X\Operations\Customer Service;ES1
+user055;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user056;Sales Spain;Company X\Sales\Sales Spain;ES1
+user057;Logistics;Company X\Operations\Logistics;DE1
+user058;Marketing;Company X\Marketing;CH1
+user059;Customer Service;Company X\Operations\Customer Service;ES1
+user060;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user061;Sales Spain;Company X\Sales\Sales Spain;ES1
+user062;Logistics;Company X\Operations\Logistics;DE1
+user063;Marketing;Company X\Marketing;CH1
+user064;Customer Service;Company X\Operations\Customer Service;ES1
+user065;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user066;Sales Spain;Company X\Sales\Sales Spain;ES1
+user067;Logistics;Company X\Operations\Logistics;DE1
+user068;Marketing;Company X\Marketing;CH1
+user069;Customer Service;Company X\Operations\Customer Service;ES1
+user070;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user071;Sales Spain;Company X\Sales\Sales Spain;ES1
+user072;Logistics;Company X\Operations\Logistics;DE1
+user073;Marketing;Company X\Marketing;CH1
+user074;Customer Service;Company X\Operations\Customer Service;ES1
+user075;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user076;Sales Spain;Company X\Sales\Sales Spain;ES1
+user077;Logistics;Company X\Operations\Logistics;DE1
+user078;Marketing;Company X\Marketing;CH1
+user079;Customer Service;Company X\Operations\Customer Service;ES1
+user080;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user081;Sales Spain;Company X\Sales\Sales Spain;ES1
+user082;Logistics;Company X\Operations\Logistics;DE1
+user083;Marketing;Company X\Marketing;CH1
+user084;Customer Service;Company X\Operations\Customer Service;ES1
+user085;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user086;Sales Spain;Company X\Sales\Sales Spain;ES1
+user087;Logistics;Company X\Operations\Logistics;DE1
+user088;Marketing;Company X\Marketing;CH1
+user089;Customer Service;Company X\Operations\Customer Service;ES1
+user090;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user091;Sales Spain;Company X\Sales\Sales Spain;ES1
+user092;Logistics;Company X\Operations\Logistics;DE1
+user093;Marketing;Company X\Marketing;CH1
+user094;Customer Service;Company X\Operations\Customer Service;ES1
+user095;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user096;Sales Spain;Company X\Sales\Sales Spain;ES1
+user097;Logistics;Company X\Operations\Logistics;DE1
+user098;Marketing;Company X\Marketing;CH1
+user099;Customer Service;Company X\Operations\Customer Service;ES1
+user100;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user101;Sales Spain;Company X\Sales\Sales Spain;ES1
+user102;Logistics;Company X\Operations\Logistics;DE1
+user103;Marketing;Company X\Marketing;CH1
+user104;Customer Service;Company X\Operations\Customer Service;ES1
+user105;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user106;Sales Spain;Company X\Sales\Sales Spain;ES1
+user107;Logistics;Company X\Operations\Logistics;DE1
+user108;Marketing;Company X\Marketing;CH1
+user109;Customer Service;Company X\Operations\Customer Service;ES1
+user110;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user111;Sales Spain;Company X\Sales\Sales Spain;ES1
+user112;Logistics;Company X\Operations\Logistics;DE1
+user113;Marketing;Company X\Marketing;CH1
+user114;Customer Service;Company X\Operations\Customer Service;ES1
+user115;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user116;Sales Spain;Company X\Sales\Sales Spain;ES1
+user117;Logistics;Company X\Operations\Logistics;DE1
+user118;Marketing;Company X\Marketing;CH1
+user119;Customer Service;Company X\Operations\Customer Service;ES1
+user120;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user121;Sales Spain;Company X\Sales\Sales Spain;ES1
+user122;Logistics;Company X\Operations\Logistics;DE1
+user123;Marketing;Company X\Marketing;CH1
+user124;Customer Service;Company X\Operations\Customer Service;ES1
+user125;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user126;Sales Spain;Company X\Sales\Sales Spain;ES1
+user127;Logistics;Company X\Operations\Logistics;DE1
+user128;Marketing;Company X\Marketing;CH1
+user129;Customer Service;Company X\Operations\Customer Service;ES1
+user130;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user131;Sales Spain;Company X\Sales\Sales Spain;ES1
+user132;Logistics;Company X\Operations\Logistics;DE1
+user133;Marketing;Company X\Marketing;CH1
+user134;Customer Service;Company X\Operations\Customer Service;ES1
+user135;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user136;Sales Spain;Company X\Sales\Sales Spain;ES1
+user137;Logistics;Company X\Operations\Logistics;DE1
+user138;Marketing;Company X\Marketing;CH1
+user139;Customer Service;Company X\Operations\Customer Service;ES1
+user140;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user141;Sales Spain;Company X\Sales\Sales Spain;ES1
+user142;Logistics;Company X\Operations\Logistics;DE1
+user143;Marketing;Company X\Marketing;CH1
+user144;Customer Service;Company X\Operations\Customer Service;ES1
+user145;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user146;Sales Spain;Company X\Sales\Sales Spain;ES1
+user147;Logistics;Company X\Operations\Logistics;DE1
+user148;Marketing;Company X\Marketing;CH1
+user149;Customer Service;Company X\Operations\Customer Service;ES1
+user150;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user151;Sales Spain;Company X\Sales\Sales Spain;ES1
+user152;Logistics;Company X\Operations\Logistics;DE1
+user153;Marketing;Company X\Marketing;CH1
+user154;Customer Service;Company X\Operations\Customer Service;ES1
+user155;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user156;Sales Spain;Company X\Sales\Sales Spain;ES1
+user157;Logistics;Company X\Operations\Logistics;DE1
+user158;Marketing;Company X\Marketing;CH1
+user159;Customer Service;Company X\Operations\Customer Service;ES1
+user160;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user161;Sales Spain;Company X\Sales\Sales Spain;ES1
+user162;Logistics;Company X\Operations\Logistics;DE1
+user163;Marketing;Company X\Marketing;CH1
+user164;Customer Service;Company X\Operations\Customer Service;ES1
+user165;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user166;Sales Spain;Company X\Sales\Sales Spain;ES1
+user167;Logistics;Company X\Operations\Logistics;DE1
+user168;Marketing;Company X\Marketing;CH1
+user169;Customer Service;Company X\Operations\Customer Service;ES1
+user170;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user171;Sales Spain;Company X\Sales\Sales Spain;ES1
+user172;Logistics;Company X\Operations\Logistics;DE1
+user173;Marketing;Company X\Marketing;CH1
+user174;Customer Service;Company X\Operations\Customer Service;ES1
+user175;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user176;Sales Spain;Company X\Sales\Sales Spain;ES1
+user177;Logistics;Company X\Operations\Logistics;DE1
+user178;Marketing;Company X\Marketing;CH1
+user179;Customer Service;Company X\Operations\Customer Service;ES1
+user180;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user181;Sales Spain;Company X\Sales\Sales Spain;ES1
+user182;Logistics;Company X\Operations\Logistics;DE1
+user183;Marketing;Company X\Marketing;CH1
+user184;Customer Service;Company X\Operations\Customer Service;ES1
+user185;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user186;Sales Spain;Company X\Sales\Sales Spain;ES1
+user187;Logistics;Company X\Operations\Logistics;DE1
+user188;Marketing;Company X\Marketing;CH1
+user189;Customer Service;Company X\Operations\Customer Service;ES1
+user190;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user191;Sales Spain;Company X\Sales\Sales Spain;ES1
+user192;Logistics;Company X\Operations\Logistics;DE1
+user193;Marketing;Company X\Marketing;CH1
+user194;Customer Service;Company X\Operations\Customer Service;ES1
+user195;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user196;Sales Spain;Company X\Sales\Sales Spain;ES1
+user197;Logistics;Company X\Operations\Logistics;DE1
+user198;Marketing;Company X\Marketing;CH1
+user199;Customer Service;Company X\Operations\Customer Service;ES1
+user200;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user201;Sales Spain;Company X\Sales\Sales Spain;ES1
+user202;Logistics;Company X\Operations\Logistics;DE1
+user203;Marketing;Company X\Marketing;CH1
+user204;Customer Service;Company X\Operations\Customer Service;ES1
+user205;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user206;Sales Spain;Company X\Sales\Sales Spain;ES1
+user207;Logistics;Company X\Operations\Logistics;DE1
+user208;Marketing;Company X\Marketing;CH1
+user209;Customer Service;Company X\Operations\Customer Service;ES1
+user210;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user211;Sales Spain;Company X\Sales\Sales Spain;ES1
+user212;Logistics;Company X\Operations\Logistics;DE1
+user213;Marketing;Company X\Marketing;CH1
+user214;Customer Service;Company X\Operations\Customer Service;ES1
+user215;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user216;Sales Spain;Company X\Sales\Sales Spain;ES1
+user217;Logistics;Company X\Operations\Logistics;DE1
+user218;Marketing;Company X\Marketing;CH1
+user219;Customer Service;Company X\Operations\Customer Service;ES1
+user220;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user221;Sales Spain;Company X\Sales\Sales Spain;ES1
+user222;Logistics;Company X\Operations\Logistics;DE1
+user223;Marketing;Company X\Marketing;CH1
+user224;Customer Service;Company X\Operations\Customer Service;ES1
+user225;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user226;Sales Spain;Company X\Sales\Sales Spain;ES1
+user227;Logistics;Company X\Operations\Logistics;DE1
+user228;Marketing;Company X\Marketing;CH1
+user229;Customer Service;Company X\Operations\Customer Service;ES1
+user230;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user231;Sales Spain;Company X\Sales\Sales Spain;ES1
+user232;Logistics;Company X\Operations\Logistics;DE1
+user233;Marketing;Company X\Marketing;CH1
+user234;Customer Service;Company X\Operations\Customer Service;ES1
+user235;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user236;Sales Spain;Company X\Sales\Sales Spain;ES1
+user237;Logistics;Company X\Operations\Logistics;DE1
+user238;Marketing;Company X\Marketing;CH1
+user239;Customer Service;Company X\Operations\Customer Service;ES1
+user240;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user241;Sales Spain;Company X\Sales\Sales Spain;ES1
+user242;Logistics;Company X\Operations\Logistics;DE1
+user243;Marketing;Company X\Marketing;CH1
+user244;Customer Service;Company X\Operations\Customer Service;ES1
+user245;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user246;Sales Spain;Company X\Sales\Sales Spain;ES1
+user247;Logistics;Company X\Operations\Logistics;DE1
+user248;Marketing;Company X\Marketing;CH1
+user249;Customer Service;Company X\Operations\Customer Service;ES1
+user250;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user251;Sales Spain;Company X\Sales\Sales Spain;ES1
+user252;Logistics;Company X\Operations\Logistics;DE1
+user253;Marketing;Company X\Marketing;CH1
+user254;Customer Service;Company X\Operations\Customer Service;ES1
+user255;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user256;Sales Spain;Company X\Sales\Sales Spain;ES1
+user257;Logistics;Company X\Operations\Logistics;DE1
+user258;Marketing;Company X\Marketing;CH1
+user259;Customer Service;Company X\Operations\Customer Service;ES1
+user260;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user261;Sales Spain;Company X\Sales\Sales Spain;ES1
+user262;Logistics;Company X\Operations\Logistics;DE1
+user263;Marketing;Company X\Marketing;CH1
+user264;Customer Service;Company X\Operations\Customer Service;ES1
+user265;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user266;Sales Spain;Company X\Sales\Sales Spain;ES1
+user267;Logistics;Company X\Operations\Logistics;DE1
+user268;Marketing;Company X\Marketing;CH1
+user269;Customer Service;Company X\Operations\Customer Service;ES1
+user270;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user271;Sales Spain;Company X\Sales\Sales Spain;ES1
+user272;Logistics;Company X\Operations\Logistics;DE1
+user273;Marketing;Company X\Marketing;CH1
+user274;Customer Service;Company X\Operations\Customer Service;ES1
+user275;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user276;Sales Spain;Company X\Sales\Sales Spain;ES1
+user277;Logistics;Company X\Operations\Logistics;DE1
+user278;Marketing;Company X\Marketing;CH1
+user279;Customer Service;Company X\Operations\Customer Service;ES1
+user280;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user281;Sales Spain;Company X\Sales\Sales Spain;ES1
+user282;Logistics;Company X\Operations\Logistics;DE1
+user283;Marketing;Company X\Marketing;CH1
+user284;Customer Service;Company X\Operations\Customer Service;ES1
+user285;Sales Switzerland;Company X\Sales\Sales Switzerland;CH1
+user286;Sales Spain;Company X\Sales\Sales Spain;ES1
+user287;Logistics;Company X\Operations\Logistics;DE1
+user288;Marketing;Company X\Marketing;CH1
+user289;Customer Service;Company X\Operations\Customer Service;ES1

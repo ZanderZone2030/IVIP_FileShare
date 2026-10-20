@@ -1,0 +1,14 @@
+# Scans, findings and pages contain the full permission map of a share and the
+# members of its groups. Never commit real ones: only the synthetic samples and
+# the demo built from them are tracked.
+*.csv
+*.html
+!samples/*.csv
+!docs/demo/*.html
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store

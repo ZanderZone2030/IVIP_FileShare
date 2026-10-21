@@ -36,7 +36,7 @@ flowchart LR
 
 Ask any of these questions and get the answer on the page, with the path that explains it:
 
-- Which **teams and locations** (CH1, ES1, ...) can reach this folder, with what rights, and through which group?
+- Which **teams and locations** (US, ES, ...) can reach this folder, with what rights, and through which group?
 - Which folders can **this person**, group, role or team reach, including everything below through inheritance?
 - Which **individual accounts** have their own entries instead of going through a group?
 - Where do **external accounts** (consultants) get access, directly or hidden in nested groups?

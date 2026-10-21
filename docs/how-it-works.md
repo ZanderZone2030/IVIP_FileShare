@@ -149,4 +149,4 @@ On a synthetic share of 18,201 folders with 6,000 users in 200 nested groups, 44
 - **PowerShell.** Windows PowerShell 5.1 and PowerShell 7. The graph script is saved as UTF-8 with a byte-order mark, so 5.1 reads its accented text correctly.
 - **Windows language.** French and German group names are recognised as well as English.
 - **Browser.** Any current browser: Edge, Chrome, Firefox or Safari. The page follows the system light or dark theme.
-- **Input files.** CSV re-saved from Excel with `;` separators is accepted.
+- **Input files.** CSV re-saved from Excel with `;` separators is accepted. The encoding is detected the same way in both scripts: a byte-order mark if there is one, otherwise UTF-8 if the file is valid UTF-8, otherwise the ANSI code page. Accented names survive an Excel re-save in PowerShell 5.1 and 7.

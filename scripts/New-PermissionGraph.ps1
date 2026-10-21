@@ -220,12 +220,35 @@ $accessLevels = @(foreach ($v in $DirectAccessLevels) {
 # Helpers
 # =============================================================================================
 
+function Get-CsvEncoding {
+    # Encoding to read a CSV with: the byte-order mark if there is one, else UTF-8 when the start of the
+    # file is valid UTF-8, else the ANSI code page (a CSV re-saved from Excel). Without this, PS 7 reads
+    # ANSI as UTF-8 and PS 5.1 reads UTF-8 without BOM as ANSI, and accented names break.
+    param([string]$File)
+    $buf = [byte[]]::new(1MB)
+    $fs  = [System.IO.File]::OpenRead($File)
+    try { $n = $fs.Read($buf, 0, $buf.Length) } finally { $fs.Dispose() }
+    if ($n -ge 3 -and $buf[0] -eq 0xEF -and $buf[1] -eq 0xBB -and $buf[2] -eq 0xBF) { return 'UTF8' }
+    if ($n -ge 2 -and $buf[0] -eq 0xFF -and $buf[1] -eq 0xFE) { return 'Unicode' }
+    if ($n -ge 2 -and $buf[0] -eq 0xFE -and $buf[1] -eq 0xFF) { return 'BigEndianUnicode' }
+    try {
+        # A decoder without flush accepts a character cut off at the end of the buffer
+        $null = [System.Text.UTF8Encoding]::new($false, $true).GetDecoder().GetChars($buf, 0, $n, [char[]]::new($n), 0)
+        return 'UTF8'
+    } catch [System.Text.DecoderFallbackException] { }
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage)
+    }
+    'Default'
+}
+
 function Import-DelimitedCsv {
     # Accepts ; as delimiter too, in case the CSV was re-saved from Excel
     param([string]$File)
-    $header    = Get-Content -LiteralPath $File -TotalCount 1
+    $encoding  = Get-CsvEncoding $File
+    $header    = Get-Content -LiteralPath $File -TotalCount 1 -Encoding $encoding
     $delimiter = if ($header -match ';' -and $header -notmatch ',') { ';' } else { ',' }
-    @(Import-Csv -LiteralPath $File -Delimiter $delimiter)
+    @(Import-Csv -LiteralPath $File -Delimiter $delimiter -Encoding $encoding)
 }
 
 function Assert-Columns {
@@ -975,15 +998,16 @@ if ($IncludeGroupMembers) {
 # =============================================================================================
 
 function Import-AnyCsv {
-    # Comma, semicolon or tab separated; UTF-8 (with or without BOM) or UTF-16 with BOM
+    # Comma, semicolon or tab separated; UTF-8 (with or without BOM), UTF-16 with BOM, or ANSI
     param([string]$File)
-    $first = [string](Get-Content -LiteralPath $File -TotalCount 1 -Encoding UTF8)
+    $encoding = Get-CsvEncoding $File
+    $first = [string](Get-Content -LiteralPath $File -TotalCount 1 -Encoding $encoding)
     $best = ','; $bestCount = -1
     foreach ($d in @(',', ';', "`t")) {
         $c = $first.Split($d).Count - 1
         if ($c -gt $bestCount) { $best = $d; $bestCount = $c }
     }
-    @(Import-Csv -LiteralPath $File -Delimiter $best -Encoding UTF8)
+    @(Import-Csv -LiteralPath $File -Delimiter $best -Encoding $encoding)
 }
 
 function Get-GroupKey {
@@ -1297,7 +1321,7 @@ $template = @'
   --sev0:#d03b3b; --sev1:#ec835a; --sev2:#fab219; --sev3:#898781;
   --sev0-ink:#ffffff; --sev1-ink:#0b0b0b; --sev2-ink:#0b0b0b; --sev3-ink:#0b0b0b;
   --nest:#6250d6; --nest-fill:#edebf7;
-  --rk0:#1baf7a; --rk0-fill:#e1f3eb; --rk1:#e87ba4; --rk1-fill:#f9ecf1;
+  --rk0:#12a5a8; --rk0-fill:#e0f4f4; --rk1:#c63fb8; --rk1-fill:#f8e7f5;
   --shadow:0 4px 16px rgba(11,11,11,.12);
 }
 @media (prefers-color-scheme: dark){
@@ -1307,7 +1331,7 @@ $template = @'
     --line:#2c2c2a; --edge:#55544f; --border:rgba(255,255,255,.10); --chip:#2c2c2a; --hover:rgba(255,255,255,.06);
     --accent:#3987e5; --grant:#3987e5; --grant-ink:#0b0b0b; --reach:#104281; --reach-ink:#f0efec; --deny:#e66767;
     --nest:#9085e9; --nest-fill:#322f43;
-    --rk0:#199e70; --rk0-fill:#1a372c; --rk1:#d55181; --rk1-fill:#432630;
+    --rk0:#1fb5b8; --rk0-fill:#173336; --rk1:#d55cc8; --rk1-fill:#3e2540;
     --shadow:0 4px 16px rgba(0,0,0,.5);
   }
 }
@@ -1317,7 +1341,7 @@ $template = @'
   --line:#2c2c2a; --edge:#55544f; --border:rgba(255,255,255,.10); --chip:#2c2c2a; --hover:rgba(255,255,255,.06);
   --accent:#3987e5; --grant:#3987e5; --grant-ink:#0b0b0b; --reach:#104281; --reach-ink:#f0efec; --deny:#e66767;
   --nest:#9085e9; --nest-fill:#322f43;
-  --rk0:#199e70; --rk0-fill:#1a372c; --rk1:#d55181; --rk1-fill:#432630;
+  --rk0:#1fb5b8; --rk0-fill:#173336; --rk1:#d55cc8; --rk1-fill:#3e2540;
   --shadow:0 4px 16px rgba(0,0,0,.5);
 }
 *{box-sizing:border-box}

@@ -11,7 +11,7 @@
 **File rules, for all three:**
 
 - Separator: comma, semicolon or tab. It is detected from the header line.
-- Encoding: UTF-8, with or without a byte-order mark, or UTF-16 with a byte-order mark.
+- Encoding: UTF-8 with or without a byte-order mark, UTF-16 with a byte-order mark, or ANSI (the Windows code page, as Excel saves "CSV"). It is detected from the file.
 - Columns: only the columns listed below are read. Other columns are ignored.
 
 The script prints which columns it used and how many rows matched something in the scan. If a required column is missing, it stops and lists the columns it found.

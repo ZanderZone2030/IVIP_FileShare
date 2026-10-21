@@ -343,6 +343,28 @@ function Add-Finding {
     $script:Findings.Add($finding)
 }
 
+function Get-CsvEncoding {
+    # Encoding to read a CSV with: the byte-order mark if there is one, else UTF-8 when the start of the
+    # file is valid UTF-8, else the ANSI code page (a CSV re-saved from Excel). Without this, PS 7 reads
+    # ANSI as UTF-8 and PS 5.1 reads UTF-8 without BOM as ANSI, and accented names break.
+    param([string]$File)
+    $buf = [byte[]]::new(1MB)
+    $fs  = [System.IO.File]::OpenRead($File)
+    try { $n = $fs.Read($buf, 0, $buf.Length) } finally { $fs.Dispose() }
+    if ($n -ge 3 -and $buf[0] -eq 0xEF -and $buf[1] -eq 0xBB -and $buf[2] -eq 0xBF) { return 'UTF8' }
+    if ($n -ge 2 -and $buf[0] -eq 0xFF -and $buf[1] -eq 0xFE) { return 'Unicode' }
+    if ($n -ge 2 -and $buf[0] -eq 0xFE -and $buf[1] -eq 0xFF) { return 'BigEndianUnicode' }
+    try {
+        # A decoder without flush accepts a character cut off at the end of the buffer
+        $null = [System.Text.UTF8Encoding]::new($false, $true).GetDecoder().GetChars($buf, 0, $n, [char[]]::new($n), 0)
+        return 'UTF8'
+    } catch [System.Text.DecoderFallbackException] { }
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        return [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage)
+    }
+    'Default'
+}
+
 function ConvertTo-HtmlSafe {
     param($Text)
     [System.Net.WebUtility]::HtmlEncode([string]$Text)
@@ -356,11 +378,12 @@ if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "File not found:
 $inputFile = (Resolve-Path -LiteralPath $Path).ProviderPath
 
 # Accept ; as delimiter too, in case the CSV was re-saved from Excel
-$header    = Get-Content -LiteralPath $inputFile -TotalCount 1
+$encoding  = Get-CsvEncoding $inputFile
+$header    = Get-Content -LiteralPath $inputFile -TotalCount 1 -Encoding $encoding
 $delimiter = if ($header -match ';' -and $header -notmatch ',') { ';' } else { ',' }
 
 Write-Host "Reading $inputFile ..."
-$rows = @(Import-Csv -LiteralPath $inputFile -Delimiter $delimiter)
+$rows = @(Import-Csv -LiteralPath $inputFile -Delimiter $delimiter -Encoding $encoding)
 if ($rows.Count -eq 0) { throw 'The CSV is empty.' }
 
 $required = 'FolderPath', 'Depth', 'Owner', 'InheritanceDisabled', 'Identity', 'Rights',

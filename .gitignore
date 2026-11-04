@@ -4,7 +4,15 @@
 *.csv
 *.html
 !samples/*.csv
+!samples/lastaccess/
+!samples/lastaccess/**/*.csv
 !docs/demo/*.html
+
+# Last-access logs and store backups: the sample logs are rebuilt by dev/Test-Sample.ps1,
+# and real Security log exports name people and folders
+*.evtx
+*.xml
+*.bak
 
 # Editors and OS
 .vscode/

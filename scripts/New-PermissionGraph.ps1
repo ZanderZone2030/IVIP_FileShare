@@ -111,6 +111,18 @@
     as bad config. Default 0, 1, 2, 3. Needs -IncludeGroupMembers: only AD can tell an account from a
     group. Also accepted as -UserFullControlLevels.
 
+.PARAMETER LastAccessPath
+    Optional last-access store (the folder written by Merge-LastAccess.ps1, or its lastaccess.csv).
+    Adds, per person, when they last used the shares of this scan, from the file share audit
+    (5140, and 4663 / 5145 for audited folders). People with access who did not use the shares for
+    -UnusedDays are marked "unused" (dotted grey, no colour), if the audit covers that long.
+    The folder panel lists the people with access to the folder and each one's last use of it.
+    With -FileServer, only the rows of that server are used.
+
+.PARAMETER UnusedDays
+    With -LastAccessPath: days without use after which a person with access is marked unused.
+    Default 90.
+
 .PARAMETER BusinessRolePath
     Optional export of One Identity business roles (Org) and the AD groups they assign, one row per
     role and group, with two columns:
@@ -157,6 +169,9 @@
 .EXAMPLE
     .\New-PermissionGraph.ps1 -Path .\scan.csv -FindingsPath .\scan_findings.csv -IncludeGroupMembers `
         -BusinessRolePath .\org.csv -SystemRolePath .\eset.csv -TeamPath .\departments.csv
+
+.EXAMPLE
+    .\New-PermissionGraph.ps1 -Path .\scan.csv -IncludeGroupMembers -FileServer FS01 -LastAccessPath \\admin01\ivip\lastaccess
 #>
 #Requires -Version 5.1
 [CmdletBinding()]
@@ -203,7 +218,12 @@ param(
     [string]$TeamLocationColumn = 'LocationCode',
 
     [Alias('UserFullControlLevels')]
-    [string[]]$DirectAccessLevels = @('0', '1', '2', '3')
+    [string[]]$DirectAccessLevels = @('0', '1', '2', '3'),
+
+    [string]$LastAccessPath,
+
+    [ValidateRange(1, 3650)]
+    [int]$UnusedDays = 90
 )
 
 # Levels may arrive as a list (2,3 inside PowerShell) or as one text "2,3" (powershell -File, scheduled tasks)
@@ -1248,6 +1268,107 @@ if ($TeamPath) {
 }
 
 # =============================================================================================
+# Last use per person, from the last-access store (optional)
+# =============================================================================================
+
+$laJson = ''
+if ($LastAccessPath) {
+    $laFile = $LastAccessPath
+    if (Test-Path -LiteralPath $laFile -PathType Container) { $laFile = Join-Path $laFile 'lastaccess.csv' }
+    if (-not (Test-Path -LiteralPath $laFile -PathType Leaf)) { throw "File not found: $laFile" }
+    $laFile = (Resolve-Path -LiteralPath $laFile).ProviderPath
+    $laCovFile = Join-Path (Split-Path -Parent $laFile) 'coverage.csv'
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    $utcStyles = [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal
+    $toDate = { param([string]$Text) $d = [DateTime]::MinValue; if ([DateTime]::TryParse($Text, $inv, $utcStyles, [ref]$d)) { $d } else { $null } }
+    $dayText = { param($Date) if ($null -eq $Date) { '' } else { $Date.ToString('yyyy-MM-dd', $inv) } }
+    # a under b (or equal), local paths, not case-sensitive
+    $isUnder = { param([string]$a, [string]$b)
+        $a = $a.TrimEnd('\'); $b = $b.TrimEnd('\')
+        $a.Equals($b, [StringComparison]::OrdinalIgnoreCase) -or $a.StartsWith($b + '\', [StringComparison]::OrdinalIgnoreCase) }
+    $server = ''
+    if ($FileServer) { $server = $FileServer.Trim('\').Split('.')[0].ToUpperInvariant() }
+    $root = $rootPath
+
+    # The people of this page: accounts read from AD and accounts set directly on the folders
+    $laPeople = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    if ($model) {
+        foreach ($pr in $model.Principals) {
+            if (@('user', 'service', 'computer', 'foreign') -notcontains $pr.Type) { continue }
+            $k = $pr.Name.LastIndexOf('\'); $null = $laPeople.Add($(if ($k -ge 0) { $pr.Name.Substring($k + 1) } else { $pr.Name }))
+        }
+    }
+    foreach ($n in $idList) { $k = $n.IndexOf('\'); if ($k -ge 0 -and $n -notlike 'S-1-*') { $null = $laPeople.Add($n.Substring($k + 1)) } }
+
+    $users = [System.Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
+    $laPaths = [System.Collections.Generic.List[string]]::new()
+    $laPathIx = [System.Collections.Generic.Dictionary[string,int]]::new([StringComparer]::OrdinalIgnoreCase)
+    $origins = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $laRows = 0; $latest = $null
+    foreach ($r in (Import-AnyCsv $laFile)) {
+        if ($r.Source -ne 'FileShare' -or ($r.ObjectType -ne 'Share' -and $r.ObjectType -ne 'Folder')) { continue }
+        if ($server -and $r.Origin -ne $server) { continue }
+        $obj = ([string]$r.ObjectId).TrimEnd('\')
+        if (-not ((& $isUnder $obj $root) -or (& $isUnder $root $obj))) { continue }
+        $sam = [string]$r.AccountKey
+        if (-not $sam -or -not $laPeople.Contains($sam)) { continue }
+        $last = & $toDate $r.LastSeen
+        if ($null -eq $last) { continue }
+        $null = $origins.Add([string]$r.Origin)
+        $pi = 0
+        if (-not $laPathIx.TryGetValue($obj, [ref]$pi)) { $pi = $laPaths.Count; $laPathIx[$obj] = $pi; $laPaths.Add($obj) }
+        $u = $null
+        if (-not $users.TryGetValue($sam, [ref]$u)) { $u = @{ Last = $last; Rows = [System.Collections.Generic.List[string]]::new() }; $users[$sam] = $u }
+        if ($last -gt $u.Last) { $u.Last = $last }
+        if ($null -eq $latest -or $last -gt $latest) { $latest = $last }
+        $u.Rows.Add(('[{0},{1},{2},{3}]' -f $pi, (ConvertTo-JsonText (& $dayText $last)), (ConvertTo-JsonText (& $dayText (& $toDate $r.LastWrite))),
+            $(if ($r.ObjectType -eq 'Folder') { 1 } else { 0 })))
+        $laRows++
+    }
+    if ($origins.Count -gt 1) { Write-Warning "The last-access store has rows of $($origins.Count) file servers for these paths ($(@($origins) -join ', ')). Use -FileServer to pick one." }
+
+    # Coverage: the share audit (5140) gives the "unused" verdict; audited folders are listed
+    $shareFrom = $null; $ref = $null
+    $aud = [System.Collections.Generic.List[string]]::new()
+    if (Test-Path -LiteralPath $laCovFile) {
+        $byScope = @{}
+        foreach ($c in (Import-AnyCsv $laCovFile)) {
+            if ($c.Source -ne 'FileShare') { continue }
+            if ($server) { if ($c.Origin -ne $server) { continue } }
+            elseif ($origins.Count -and -not $origins.Contains([string]$c.Origin)) { continue }
+            $from = & $toDate $c.From; $to = & $toDate $c.To
+            if ($null -eq $from -or $null -eq $to) { continue }
+            $scope = ([string]$c.Scope).TrimEnd('\')
+            if ($c.Feed -ne '5140' -and -not ((& $isUnder $scope $root) -or (& $isUnder $root $scope))) { continue }
+            $key = "$($c.Feed)|$scope"
+            if (-not $byScope.ContainsKey($key) -or $to -gt $byScope[$key][1]) { $byScope[$key] = @($from, $to, [string]$c.Feed, $scope) }
+        }
+        foreach ($v in $byScope.Values) {
+            if ($null -eq $ref -or $v[1] -gt $ref) { $ref = $v[1] }
+            if ($v[2] -eq '5140') { if ($null -eq $shareFrom -or $v[0] -lt $shareFrom) { $shareFrom = $v[0] } }
+            else { $aud.Add(('[{0},{1}]' -f (ConvertTo-JsonText $v[3]), (ConvertTo-JsonText (& $dayText $v[0])))) }
+        }
+    }
+    else { Write-Warning "No coverage.csv next to $laFile. Last use is shown, but nobody can be called unused." }
+    if ($null -eq $ref) { $ref = $latest }
+    if ($null -eq $ref) { $ref = [DateTime]::UtcNow }
+
+    $uOut = foreach ($kv in $users.GetEnumerator()) {
+        '[{0},{1},[{2}]]' -f (ConvertTo-JsonText $kv.Key.ToLowerInvariant()), (ConvertTo-JsonText (& $dayText $kv.Value.Last)), ($kv.Value.Rows -join ',')
+    }
+    $laJson = '{"src":' + (ConvertTo-JsonText ([System.IO.Path]::GetFileName((Split-Path -Parent $laFile)) + '\' + [System.IO.Path]::GetFileName($laFile))) +
+              ',"ref":' + (ConvertTo-JsonText (& $dayText $ref)) + ',"days":' + $UnusedDays +
+              ',"share":' + (ConvertTo-JsonText (& $dayText $shareFrom)) + ',"aud":[' + ($aud -join ',') + ']' +
+              ',"paths":[' + ((@($laPaths | ForEach-Object { ConvertTo-JsonText $_ })) -join ',') + '],"u":[' + (@($uOut) -join ',') + ']}'
+    Write-Host ("Last access ({0}): {1:N0} people with use on these shares, {2:N0} rows; share audit {3}, end {4}." -f [System.IO.Path]::GetFileName($laFile),
+        $users.Count, $laRows, $(if ($shareFrom) { 'since ' + (& $dayText $shareFrom) } else { 'not in the coverage' }), (& $dayText $ref))
+    if (-not $shareFrom) { Write-Warning 'The store has no 5140 coverage for this server, so nobody is marked unused.' }
+    elseif (($ref - $shareFrom).TotalDays -lt $UnusedDays) {
+        Write-Warning ("The share audit covers {0:N0} days, less than -UnusedDays {1}; nobody is marked unused yet." -f ($ref - $shareFrom).TotalDays, $UnusedDays)
+    }
+}
+
+# =============================================================================================
 # Build the data block
 # =============================================================================================
 
@@ -1299,6 +1420,7 @@ Add-JsonStringArray $sb 'notes' $noteList
 if ($membershipJson) { [void]$sb.Append(',"m":').Append($membershipJson) }
 if ($roleJson)       { [void]$sb.Append(',"r":').Append($roleJson) }
 if ($teamJson)       { [void]$sb.Append(',"t":').Append($teamJson) }
+if ($laJson)         { [void]$sb.Append(',"la":').Append($laJson) }
 [void]$sb.Append('}')
 
 # =============================================================================================
@@ -1322,6 +1444,7 @@ $template = @'
   --sev0-ink:#ffffff; --sev1-ink:#0b0b0b; --sev2-ink:#0b0b0b; --sev3-ink:#0b0b0b;
   --nest:#6250d6; --nest-fill:#edebf7;
   --rk0:#12a5a8; --rk0-fill:#e0f4f4; --rk1:#c63fb8; --rk1-fill:#f8e7f5;
+  --sec-bad:#fbeaea; --sec-warn:#fdf3da; --sec-team:#008300; --sec-team-fill:#e0efe0; --sec-find:#fcebe3; --sec-perm:#e4eefb;
   --shadow:0 4px 16px rgba(11,11,11,.12);
 }
 @media (prefers-color-scheme: dark){
@@ -1332,6 +1455,7 @@ $template = @'
     --accent:#3987e5; --grant:#3987e5; --grant-ink:#0b0b0b; --reach:#104281; --reach-ink:#f0efec; --deny:#e66767;
     --nest:#9085e9; --nest-fill:#322f43;
     --rk0:#1fb5b8; --rk0-fill:#173336; --rk1:#d55cc8; --rk1-fill:#3e2540;
+    --sec-bad:#3a2222; --sec-warn:#383020; --sec-team:#0ca30c; --sec-team-fill:#1b2b1b; --sec-find:#3a2820; --sec-perm:#1a2433;
     --shadow:0 4px 16px rgba(0,0,0,.5);
   }
 }
@@ -1342,6 +1466,7 @@ $template = @'
   --accent:#3987e5; --grant:#3987e5; --grant-ink:#0b0b0b; --reach:#104281; --reach-ink:#f0efec; --deny:#e66767;
   --nest:#9085e9; --nest-fill:#322f43;
   --rk0:#1fb5b8; --rk0-fill:#173336; --rk1:#d55cc8; --rk1-fill:#3e2540;
+  --sec-bad:#3a2222; --sec-warn:#383020; --sec-team:#0ca30c; --sec-team-fill:#1b2b1b; --sec-find:#3a2820; --sec-perm:#1a2433;
   --shadow:0 4px 16px rgba(0,0,0,.5);
 }
 *{box-sizing:border-box}
@@ -1392,6 +1517,7 @@ aside{background:var(--surface);overflow:auto;min-height:0}
 .st.nest{background:var(--nest-fill);color:var(--ink);box-shadow:inset 0 0 0 1px var(--nest);font-weight:500}
 .st.acct{background:var(--chip);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--edge);font-weight:500}
 .st.acct.dis{box-shadow:none;border:1px dashed var(--muted);line-height:14px;background:transparent}
+.st.idle{background:transparent;color:var(--ink2);border:1px dotted var(--muted);line-height:14px;font-weight:500}
 .gsum{color:var(--ink2);font-size:12px;margin:0 0 6px;line-height:1.9}
 .st.rk0{background:var(--rk0-fill);color:var(--ink);box-shadow:inset 0 0 0 1px var(--rk0);font-weight:500}
 .st.rk1{background:var(--rk1-fill);color:var(--ink);box-shadow:inset 0 0 0 1px var(--rk1);font-weight:500}
@@ -1458,6 +1584,34 @@ aside{background:var(--surface);overflow:auto;min-height:0}
 .acl tr.hl .idb,.acl tr.hl .hint{color:var(--reach-ink)}
 .flist{list-style:none;padding:0;margin:0}
 .flist li{padding:6px 0;border-bottom:1px solid var(--line)}
+.flist li:last-child{border-bottom:0}
+/* folder details: one colour-coded card per section */
+.k-info{--k:var(--edge);--k-fill:var(--chip)}
+.k-bad{--k:var(--sev0);--k-fill:var(--sec-bad)}
+.k-warn{--k:var(--sev2);--k-fill:var(--sec-warn)}
+.k-team{--k:var(--sec-team);--k-fill:var(--sec-team-fill)}
+.k-find{--k:var(--sev1);--k-fill:var(--sec-find)}
+.k-perm{--k:var(--accent);--k-fill:var(--sec-perm)}
+.secnav{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0 0}
+.snav{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:1px solid var(--border);background:var(--k-fill);border-radius:12px;padding:1px 5px;font-size:11.5px;color:var(--ink);white-space:nowrap}
+.snav::before{content:"";flex:none;width:7px;height:7px;border-radius:2px;background:var(--k)}
+.snav b{font-weight:600;font-variant-numeric:tabular-nums}
+.snav:hover{border-color:var(--k)}
+.dsec{margin-top:12px;border:1px solid var(--border);border-left:3px solid var(--k);border-radius:8px;background:var(--surface);overflow:hidden;scroll-margin-top:8px}
+.dsh{display:flex;align-items:center;gap:6px;padding:5px 8px 5px 4px;background:var(--k-fill)}
+.dst{flex:1;min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;border:0;background:none;padding:3px 6px;text-align:left;border-radius:5px;color:var(--ink)}
+.dst:hover{background:var(--hover)}
+.dst .chev{flex:none;align-self:center;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--ink2);transition:transform .15s}
+.dsec.closed .chev{transform:rotate(-90deg)}
+.dtl{font-weight:600;font-size:13px}
+.dct{color:var(--ink2);font-size:12px}
+.dsh .cbtn{margin-left:0;flex:none}
+.dsb{padding:6px 12px 10px}
+.dsec.closed .dsb{display:none}
+.dsec .facts{margin:0}
+.dsb > .tlocs{margin-top:4px}
+.dsb .trow{margin:0 -8px;width:calc(100% + 16px)}
+.dsb .acl{margin-top:2px}
 .empty h2{font-size:15px;margin:0 0 6px}
 .empty p,.empty li{color:var(--ink2)}
 .empty ul{padding-left:18px;margin:8px 0}
@@ -1584,6 +1738,7 @@ aside{background:var(--surface);overflow:auto;min-height:0}
 .trow .tier{margin-left:auto;font-size:12px;color:var(--ink2);white-space:nowrap;padding-left:6px}
 .people{display:flex;flex-wrap:wrap;gap:3px 4px;max-height:180px;overflow:auto;margin:2px 0 4px}
 .pchip{font-size:11.5px;padding:0 6px;border-radius:8px;background:var(--chip);color:var(--ink2);line-height:18px}
+.pchip.idle{background:transparent;border:1px dotted var(--muted);line-height:16px}
 [hidden]{display:none !important}
 @media (max-width:1100px){ .app{grid-template-columns:270px minmax(0,1fr) 320px} }
 @media (max-width:860px){
@@ -1802,11 +1957,12 @@ function groupShort(g) {
 }
 function principalHint(id) {
   const p = pOf(id), tl = TD ? idTeam(id) : null, team = tl ? " \u00b7 " + teamLabel(tl) : "";
-  if (p < 0) return tl ? teamLabel(tl) : "";
+  if (p < 0) return (tl ? teamLabel(tl) : "") + (LA ? useHint(-id - 1).slice(tl ? 0 : 3) : "");
   const r = P[p];
   if (r[2] === 1) return "group \u00b7 " + groupShort(p);
-  if (r[2] === 0) return "user" + team;
-  return PTYPE[r[2]] + team;
+  if (r[2] === 0) return "user" + team + useHint(p);
+  if (r[2] === 5 || r[2] === 6 || r[2] === 7) return PTYPE[r[2]] + team;
+  return PTYPE[r[2]] + team + useHint(p);
 }
 // Identities in the scan through which principal p gets access: its own, those of every group it
 // is nested in, and Everyone / Authenticated Users for accounts.
@@ -1910,7 +2066,7 @@ function accountChips(id) {
   if (P[p][2] === 4) h += `<span class="st acct" title="Account from a trusted domain or forest.">other domain</span>`;
   if (P[p][3] & 2) h += `<span class="st acct" title="Account local to the file server.">local</span>`;
   if (P[p][2] === 7) h += `<span class="st acct" title="${esc(pNote(p) || "Not found in Active Directory.")}">unresolved</span>`;
-  return h;
+  return h + useChip(p);
 }
 
 // ---------------------------------------------------------------- One Identity roles
@@ -2087,6 +2243,118 @@ const teamName = (t) => TEAMS[t][0];
 const teamPathOnly = (t) => (TEAMS[t][1] && TEAMS[t][1] !== TEAMS[t][0] ? TEAMS[t][1] : "");
 const locName = (l) => (l >= 0 ? LOCS[l] : "");
 const teamLabel = (tl) => teamName(tl[0]) + (tl[1] >= 0 ? " · " + LOCS[tl[1]] : "");
+
+// ---------------------------------------------------------------- last use per person (last-access store)
+// LA: { src, ref (end of the log), days (unused after), share (start of the share audit), aud: [[folder, since]],
+//       paths: [local path], u: [[account, last use, [[path, last use, last write, 1 folder / 0 share]]]] }
+// Shown per person only: the folders are not marked.
+const LA = D.la || null, LA_DAY = 864e5;
+const laBySam = new Map();
+if (LA) for (const u of LA.u) laBySam.set(u[0], u);
+const laRef = LA ? Date.parse(LA.ref) : 0;
+const laSam = (name) => { let s = String(name); const b = s.lastIndexOf("\\"); if (b >= 0) s = s.slice(b + 1); const a = s.indexOf("@"); if (a > 0) s = s.slice(0, a); return s.toLowerCase(); };
+const laDays = (d) => Math.max(0, Math.floor((laRef - Date.parse(d)) / LA_DAY));
+const useMemo = new Map();
+// k: a principal (>= 0) or -(identity + 1), as personName
+function personUse(k) {
+  if (!LA) return null;
+  let r = useMemo.get(k);
+  if (r) return r;
+  const nm = personName(k), u = laBySam.get(laSam(nm)) || null, watched = LA.share ? laDays(LA.share) : 0;
+  // the share collector leaves computer and managed service accounts (name ending in $) out
+  r = { u, last: u ? u[1] : "", days: u ? laDays(u[1]) : -1, watched, machine: !u && /\$$/.test(nm) };
+  r.st = u && r.days <= LA.days ? "used" : LA.share && watched >= LA.days && !r.machine ? "unused" : "unknown";
+  useMemo.set(k, r);
+  return r;
+}
+const byLastUse = (a, b) => (a[1] < b[1] ? 1 : a[1] > b[1] ? -1 : 0);
+function useText(r) {
+  if (!r) return "";
+  if (r.u) {
+    const top = r.u[2].slice().sort(byLastUse)[0];
+    return `Last used ${r.last}, ${plural(r.days, "day", "days")} before ${LA.ref}` + (top ? ` (${LA.paths[top[0]]})` : "") +
+      (r.st === "unused" ? `. No use in the last ${LA.days} days` : "");
+  }
+  if (r.machine) return "Computer and service accounts are not recorded by the share audit";
+  if (!LA.share) return "Not seen; the store has no share audit for this server";
+  return `Not seen since the share audit began on ${LA.share}` + (r.st === "unknown" ? ` (${plural(r.watched, "day", "days")}, ${LA.days} needed to call it unused)` : "");
+}
+function useChip(k) {
+  const r = personUse(k);
+  if (!r || r.st !== "unused") return "";
+  return `<span class="st idle" title="${esc(useText(r) + ".")}">${r.u ? "unused " + r.days + " d" : "never used"}</span>`;
+}
+const useHint = (k) => { const r = personUse(k); return r && r.u ? " · last used " + r.last : ""; };
+let laFolderIx = null;
+function folderByPath(path) {
+  if (!laFolderIx) { laFolderIx = new Map(); for (let i = 0; i < N; i++) laFolderIx.set(fullPath(i).toLowerCase(), i); }
+  const i = laFolderIx.get(path.toLowerCase());
+  return i === undefined ? -1 : i;
+}
+function useCardHtml(k) {
+  const r = personUse(k);
+  let h = `<div class="rsec"><div class="cardnote">Last use on these shares</div><div class="cardnote">${useChip(k)}${useChip(k) ? " " : ""}${esc(useText(r))}.</div>`;
+  if (r.u) {
+    const rows = r.u[2].slice().sort(byLastUse);
+    h += `<div class="plist">` + rows.slice(0, 20).map((x) => {
+      const f = folderByPath(LA.paths[x[0]]), tag = f >= 0 ? `button class="prow" data-f="${f}"` : `div class="prow"`;
+      return `<${tag}><span class="pn">${esc(truncLeft(LA.paths[x[0]], 64))}</span><span class="pr">${x[3] ? "folder (audit)" : "share"} · last used ${esc(x[1])}${x[2] ? " · last write " + esc(x[2]) : ""}</span></${tag.split(" ")[0]}>`;
+    }).join("") + `</div>`;
+    if (rows.length > 20) h += `<div class="more">and ${fmt(rows.length - 20)} more</div>`;
+  }
+  return h + `<div class="cardnote">From ${esc(LA.src)}, up to ${esc(LA.ref)}.</div></div>`;
+}
+// People with access to a folder and their last use of it (the folder, below it, or the share that holds it)
+let useAll = false;
+const underPath = (p, f) => p === f || p.startsWith(f.endsWith("\\") ? f : f + "\\");
+function folderUse(i) {
+  const fp = fullPath(i).toLowerCase(), f = F[i], aces = f[4].concat(f[5] >= 0 ? SETS[f[5]] : []);
+  const people = new Map(), broad = [];
+  for (const a of aces) {
+    const ac = ACES[a];
+    if (ac[2]) continue;
+    const pv = peopleVia(ac[0]), tier = tierOf(RIGHTS[ac[1]]);
+    if (pv.broad) { broad.push(ac[0]); continue; }
+    for (const k of pv.people) { const e = people.get(k); if (!e || e.tier < tier) people.set(k, { k, tier, sam: laSam(personName(k)), name: personName(k) }); }
+  }
+  // People seen here who get access through everyone's groups only
+  const known = new Set([...people.values()].map((e) => e.sam));
+  const rel = (x) => { const lp = LA.paths[x[0]].toLowerCase(); return x[3] ? underPath(lp, fp) : underPath(fp, lp) || underPath(lp, fp); };
+  if (broad.length) for (const u of LA.u) if (!known.has(u[0].toLowerCase()) && u[2].some(rel)) { known.add(u[0].toLowerCase()); people.set("s:" + u[0], { k: null, tier: -1, sam: u[0].toLowerCase(), name: u[0] }); }
+  const rows = [];
+  let nUsed = 0, nIdle = 0, nUnk = 0;
+  // Inside a folder audit that covers enough days: only the folder-level evidence counts (as Join-LastAccess.ps1)
+  const aud = (LA.aud || []).filter((x) => underPath(fp, x[0].toLowerCase()) && laDays(x[1]) >= LA.days);
+  const audited = aud.length > 0;
+  const watched = audited ? Math.max(...aud.map((x) => laDays(x[1]))) : LA.share ? laDays(LA.share) : 0;
+  for (const e of people.values()) {
+    const u = laBySam.get(e.sam) || null;
+    let last = "", write = "", folder = 0;
+    if (u) for (const x of u[2]) if (rel(x) && (!audited || x[3]) && x[1] > last) { last = x[1]; folder = x[3]; write = x[2] || ""; }
+    const days = last ? laDays(last) : -1, machine = /\$$/.test(e.name);
+    const st = last && days <= LA.days ? "used" : (audited || LA.share) && watched >= LA.days && !machine ? "unused" : "unknown";
+    if (st === "used") nUsed++; else if (st === "unused") nIdle++; else nUnk++;
+    rows.push({ ...e, last, write, folder, days, st, machine });
+  }
+  rows.sort((a, b) => (b.last > a.last ? 1 : b.last < a.last ? -1 : 0) || a.name.localeCompare(b.name));
+  return { rows, broad, nUsed, nIdle, nUnk, watched, audited };
+}
+function folderUseHtml(i, r) {
+  const lim = useAll ? r.rows.length : 40;
+  let h = r.rows.slice(0, lim).map((e) => {
+    const ids = e.k === null ? [] : e.k >= 0 ? pIds.get(e.k) || [] : [-e.k - 1];
+    const tag = ids.length ? `button class="grow" data-id="${ids[0]}"` : `div class="grow"`;
+    const chip = e.st === "unused" ? `<span class="st idle">${e.last ? "unused " + e.days + " d" : "never used"}</span>` : "";
+    const meta = e.last ? `last used ${e.last} · ${e.folder ? "folder audit" : "share connection"}${e.write ? " · last write " + e.write : ""}`
+      : e.machine ? "computer or service account, not recorded" : e.st === "unknown" ? `not seen; ${plural(r.watched, "day", "days")} of audit, ${LA.days} needed` : `not seen in ${plural(r.watched, "day", "days")} of audit`;
+    const via = e.tier < 0 ? " · access everyone has" : e.tier >= 0 ? " · " + TIER[e.tier] : "";
+    return `<${tag}><span class="nm">${esc(e.name)}${chip ? " " + chip : ""}</span><span class="meta">${esc(meta + via)}</span></${tag.split(" ")[0]}>`;
+  }).join("");
+  if (r.rows.length > 40) h += `<button class="linkbtn" id="uall">${useAll ? "Show the first 40" : `Show all ${fmt(r.rows.length)} people`}</button>`;
+  if (!r.rows.length) h += `<div class="cardnote">${M ? "Nobody gets access here beyond what everyone has, and nobody was seen using it." : "No person has an own entry here. Build the page with -IncludeGroupMembers to list the people who get access through groups."}</div>`;
+  if (r.broad.length) h += `<div class="cardnote">${esc(`Also open to everyone through ${listNames(r.broad.map((id) => IDS[id]))}: only the people seen using it are listed for that.`)}</div>`;
+  return h + `<div class="cardnote">${esc(`From ${LA.src}, up to ${LA.ref}. ${r.audited ? "Folder audit (4663 / 5145) of this folder and below." : "Use of the folder, a folder below it, or the share that holds it."}`)}</div>`;
+}
 // Access everyone has (Everyone, Authenticated Users, Domain Users, BUILTIN\Users and groups that contain
 // them) is not counted per team: it would put every team on every folder.
 const BROADP = new Set();
@@ -2768,6 +3036,7 @@ function showMTip(n, e) {
   if (r[1]) h += `<div>${esc(r[1])}</div>`;
   h += `<div>${esc(cap1(PTYPE[r[2]]))}${r[3] & 2 ? " on the file server" : ""}${r[3] & 1 ? " \u00b7 disabled" : ""}</div>`;
   if (r[3] & 8) h += `<div>E External account (AD path contains ${esc(EXT_OU.map((o) => "'" + o + "'").join(" or "))})</div>`;
+  if (LA && isAccount(n.p)) h += `<div>${esc(useText(personUse(n.p)))}</div>`;
   if (TD && isAccount(n.p)) { const tl = personTeam(n.p); if (tl) h += `<div>Team: ${esc(teamLabel(tl))}</div>` + (teamPathOnly(tl[0]) ? `<div class="muted">${esc(TEAMS[tl[0]][1])}</div>` : ""); }
   if (TD && r[2] === 1 && PG.has(n.p)) { const tg = teamsInGroup(n.p); if (tg.teams.length) h += `<div>Teams: ${esc(listNames(tg.teams.map((e) => `${teamName(e.t)} (${fmt(e.n)})`)))}</div>`; }
   for (const id of pIds.get(n.p) || []) { const f = idFlag.get(id); if (f && f.fc.length) h += `<div class="warn">! ${esc(f.fc.join(" "))}</div>`; }
@@ -2909,6 +3178,7 @@ function renderIdCard() {
         (tg.none ? `<div class="cardnote">${plural(tg.none, "account is", "accounts are")} not in the team file.</div>` : "") + `</div>`;
     }
   }
+  if (LA && (p >= 0 ? isAccount(p) : laBySam.has(laSam(IDS[selId])))) h += useCardHtml(p >= 0 ? p : -selId - 1);
   h += `<div class="stats"><div><b>${fmt(fs.size)}</b><span>granted explicitly</span></div><div><b>${fmt(ownAny)}</b><span>with an entry, incl. inherited</span></div><div><b>${fmt(owned.get(selId) || 0)}</b><span>owned</span></div></div>`;
   if (pl.length) {
     h += `<div class="plist">` + pl.slice(0, 300).map(([i, a, above]) => {
@@ -3039,9 +3309,7 @@ function renderRoleList() {
 let selTeam = -1, selLoc = -1, teamsAll = false;
 function folderTeamsHtml(i) {
   const ft = folderTeams(i);
-  let h = `<h3>Teams with access <span class="muted">· ${plural(ft.teams.length, "team", "teams")}${ft.locs.length ? ", " + plural(ft.locs.length, "location", "locations") : ""}</span>`;
-  if (ft.teams.length) h += `<button class="cbtn" data-tcopy="${i}" title="Copy as a table: team, full path, location, people, access, groups (right-click the folder for the people)">Copy</button>`;
-  h += `</h3>`;
+  let h = "";
   if (ft.locs.length) h += `<div class="tlocs">${ft.locs.map(([l, n]) => locChip(l, n, " with access")).join("")}</div>`;
   const lim = teamsAll ? ft.teams.length : 12;
   h += ft.teams.slice(0, lim).map((e) => {
@@ -3084,8 +3352,8 @@ function teamCardHtml(t) {
   if (ps.length) {
     ps.sort((a, b) => personName(a).localeCompare(personName(b)));
     h += `<div class="cardnote">People with access</div><div class="people">` + ps.slice(0, 200).map((k) => {
-      const tl = personTeam(k), d = k >= 0 ? P[k][1] : "";
-      return `<span class="pchip" title="${esc(personName(k) + (d ? " · " + d : "") + (tl && tl[1] >= 0 ? " · " + LOCS[tl[1]] : ""))}">${esc(namePart(personName(k)))}</span>`;
+      const tl = personTeam(k), d = k >= 0 ? P[k][1] : "", ur = personUse(k);
+      return `<span class="pchip${ur && ur.st === "unused" ? " idle" : ""}" title="${esc(personName(k) + (d ? " · " + d : "") + (tl && tl[1] >= 0 ? " · " + LOCS[tl[1]] : "") + (ur ? "\n" + useText(ur) : ""))}">${esc(namePart(personName(k)))}</span>`;
     }).join("") + (ps.length > 200 ? `<span class="pchip">+ ${fmt(ps.length - 200)} more</span>` : "") + `</div>`;
   }
   const rest = Math.max(0, known.size - ps.length);
@@ -3166,50 +3434,92 @@ function selectLoc(l) {
 }
 const clearTeams = () => { if (selTeam >= 0 || selLoc >= 0) { selTeam = -1; selLoc = -1; renderTeamList(); } };
 
+// Folder details: one colour-coded card per section (folder, flags, teams, findings, permissions).
+// Sections can be collapsed; the choice is remembered in this browser.
+let secClosed = new Set();
+try { secClosed = new Set(JSON.parse(localStorage.getItem("permgraph.closed") || "[]")); } catch (_) { /* storage blocked: keep defaults */ }
+function saveSecClosed() { try { localStorage.setItem("permgraph.closed", JSON.stringify([...secClosed])); } catch (_) { /* ignore */ } }
+function secHtml(key, kind, title, count, body, tools = "") {
+  const closed = secClosed.has(key);
+  return `<section class="dsec ${kind}${closed ? " closed" : ""}" id="sec-${key}"><div class="dsh"><button class="dst" data-sec="${key}" aria-expanded="${!closed}" title="${closed ? "Show" : "Hide"} this section">` +
+    `<span class="chev"></span><span class="dtl">${title}</span>${count ? `<span class="dct">${count}</span>` : ""}</button>${tools}</div><div class="dsb">${body}</div></section>`;
+}
 function renderDetails() {
   const el = $("details");
   if (selF < 0) {
     el.innerHTML = `<div class="empty"><h2>No folder selected</h2><p>Click a folder to see its owner and permissions.</p><ul><li>Click <b>+</b> on a folder, or double-click it, to open it.</li><li>Pick an identity on the left to see where it has access.</li><li>Drag to pan, scroll to zoom.</li></ul></div>`;
     return;
   }
-  const i = selF, f = F[i];
-  let h = `<h2>${esc(f[0])}</h2><div class="path">${esc(fullPath(i))}<button class="cbtn" data-copy="${esc(fullPath(i))}" data-what="path" title="Copy the path (or right-click the folder)">Copy path</button></div>`;
-  h += `<dl class="facts"><dt>Owner</dt><dd>${f[2] >= 0 ? idBtn(f[2]) : '<span class="muted">unknown</span>'}</dd>`;
-  h += `<dt>Inheritance</dt><dd>${f[3] & 1 ? "<b>Disabled</b> on this folder" : "Enabled"}</dd>`;
-  h += `<dt>Level</dt><dd>${depth[i]}${depth[i] === 0 ? " (scanned folder)" : ""}</dd>`;
-  h += `<dt>Subfolders</dt><dd>${fmt(desc[i])}</dd>`;
-  if (f[6] >= 0) h += `<dt>Note</dt><dd class="warn">${esc(NOTES[f[6]])}</dd>`;
-  h += `</dl>`;
+  const i = selF, f = F[i], secs = [], nav = [];
+  const add = (key, kind, label, n, html) => { secs.push(html); if (n !== null) nav.push(`<button class="snav ${kind}" data-jump="${key}" title="Go to ${label}">${label}<b>${fmt(n)}</b></button>`); };
+  let facts = `<dl class="facts"><dt>Owner</dt><dd>${f[2] >= 0 ? idBtn(f[2]) : '<span class="muted">unknown</span>'}</dd>`;
+  facts += `<dt>Inheritance</dt><dd>${f[3] & 1 ? "<b>Disabled</b> on this folder" : "Enabled"}</dd>`;
+  facts += `<dt>Level</dt><dd>${depth[i]}${depth[i] === 0 ? " (scanned folder)" : ""}</dd>`;
+  facts += `<dt>Subfolders</dt><dd>${fmt(desc[i])}</dd>`;
+  if (f[6] >= 0) facts += `<dt>Note</dt><dd class="warn">${esc(NOTES[f[6]])}</dd>`;
+  facts += `</dl>`;
+  add("folder", "k-info", "Folder", null, secHtml("folder", "k-info", "Folder", "", facts));
   const ffl = folderFlags.get(i);
   if (ffl) {
-    h += `<h3>Flags</h3><ul class="flist">` +
+    const n = ffl.bad.length + ffl.ext.length, kind = ffl.bad.length ? "k-bad" : "k-warn";
+    const body = `<ul class="flist">` +
       ffl.bad.map((t) => `<li><span class="st bad">! ${/Full Control/.test(t) ? "full control" : "direct access"}</span> ${esc(t)}</li>`).join("") +
       ffl.ext.map((t) => `<li><span class="st warn">E external access</span> ${esc(t)}</li>`).join("") + `</ul>`;
+    const cnt = [ffl.bad.length ? `${fmt(ffl.bad.length)} red` : "", ffl.ext.length ? `${fmt(ffl.ext.length)} yellow` : ""].filter(Boolean).join(", ");
+    add("flags", kind, "Flags", n, secHtml("flags", kind, "Flags", cnt, body));
   }
-  if (TD) h += folderTeamsHtml(i);
+  if (TD) {
+    const ft = folderTeams(i);
+    const cnt = plural(ft.teams.length, "team", "teams") + (ft.locs.length ? ", " + plural(ft.locs.length, "location", "locations") : "");
+    const tools = ft.teams.length ? `<button class="cbtn" data-tcopy="${i}" title="Copy as a table: team, full path, location, people, access, groups (right-click the folder for the people)">Copy</button>` : "";
+    add("teams", "k-team", "Teams", ft.teams.length, secHtml("teams", "k-team", "Teams with access", cnt, folderTeamsHtml(i), tools));
+  }
+  if (LA) {
+    const fu = folderUse(i);
+    const cnt = [`${fmt(fu.nUsed)} used`, `${fmt(fu.nIdle)} unused`, fu.nUnk ? `${fmt(fu.nUnk)} unknown` : ""].filter(Boolean).join(", ");
+    add("use", "k-info", "People", fu.rows.length, secHtml("use", "k-info", "People with access, last use", cnt, folderUseHtml(i, fu)));
+  }
   const fl = findBy.get(i);
   if (fl && fl.length) {
-    h += `<h3>Findings</h3><ul class="flist">` + fl.slice().sort((a, b) => FIND[a][1] - FIND[b][1]).map((k) => {
+    const body = `<ul class="flist">` + fl.slice().sort((a, b) => FIND[a][1] - FIND[b][1]).map((k) => {
       const x = FIND[k];
       return `<li><span class="sevb s${x[1]}">${SEV_NAME[x[1]]}</span> <b>${esc(x[3])}</b>${x[4] ? " \u00b7 " + esc(x[4]) : ""}${x[5] ? " \u00b7 " + esc(x[5]) : ""}${x[6] ? `<div class="muted">${esc(x[6])}</div>` : ""}</li>`;
     }).join("") + `</ul>`;
+    add("findings", "k-find", "Findings", fl.length, secHtml("findings", "k-find", "Findings", `${plural(fl.length, "finding", "findings")}, worst ${SEV_NAME[worst[i]]}`, body));
   }
   const ex = f[4], inh = f[5] >= 0 ? SETS[f[5]] : [];
-  h += `<h3>Permissions <span class="muted">\u00b7 ${fmt(ex.length)} explicit, ${fmt(inh.length)} inherited</span></h3>`;
+  let perm;
   if (!ex.length && !inh.length) {
-    h += `<p class="muted">No entries recorded for this folder.</p>`;
+    perm = `<p class="muted">No entries recorded for this folder.</p>`;
   } else {
     const row = (a) => {
       const ac = ACES[a], hint = principalHint(ac[0]);
       const chips = accountChips(ac[0]) + groupChips(pOf(ac[0])) + identityExtChip(ac[0]) + roleChips(rolesForId(ac[0]));
       return `<tr${HL && HL.has(ac[0]) ? ' class="hl"' : ""}><td>${idBtn(ac[0])}${hint || chips ? `<span class="hint">${esc(hint)}${chips}</span>` : ""}</td><td>${ac[2] ? '<span class="deny">Deny</span> ' : ""}${esc(RIGHTS[ac[1]])}</td><td>${esc(APPLIES[ac[3]])}</td></tr>`;
     };
-    h += `<table class="acl"><thead><tr><th>Identity</th><th>Access</th><th>Applies to</th></tr></thead><tbody>`;
-    if (ex.length) h += `<tr class="grp"><td colspan="3">Explicit</td></tr>` + ex.map(row).join("");
-    if (inh.length) h += `<tr class="grp"><td colspan="3">Inherited</td></tr>` + inh.map(row).join("");
-    h += `</tbody></table>`;
+    perm = `<table class="acl"><thead><tr><th>Identity</th><th>Access</th><th>Applies to</th></tr></thead><tbody>`;
+    if (ex.length) perm += `<tr class="grp"><td colspan="3">Explicit</td></tr>` + ex.map(row).join("");
+    if (inh.length) perm += `<tr class="grp"><td colspan="3">Inherited</td></tr>` + inh.map(row).join("");
+    perm += `</tbody></table>`;
   }
-  el.innerHTML = h;
+  add("perms", "k-perm", "Permissions", ex.length + inh.length, secHtml("perms", "k-perm", "Permissions", `${fmt(ex.length)} explicit, ${fmt(inh.length)} inherited`, perm));
+  let h = `<h2>${esc(f[0])}</h2><div class="path">${esc(fullPath(i))}<button class="cbtn" data-copy="${esc(fullPath(i))}" data-what="path" title="Copy the path (or right-click the folder)">Copy path</button></div>`;
+  if (nav.length > 1) h += `<nav class="secnav" aria-label="Sections">${nav.join("")}</nav>`;
+  el.innerHTML = h + secs.join("");
+}
+function toggleSection(key) {
+  if (secClosed.has(key)) secClosed.delete(key); else secClosed.add(key);
+  saveSecClosed();
+  const sec = $("sec-" + key);
+  if (!sec) return;
+  const closed = secClosed.has(key), b = sec.querySelector(".dst");
+  sec.classList.toggle("closed", closed);
+  b.setAttribute("aria-expanded", String(!closed)); b.title = (closed ? "Show" : "Hide") + " this section";
+}
+function jumpToSection(key) {
+  if (secClosed.has(key)) toggleSection(key);
+  const sec = $("sec-" + key);
+  if (sec) sec.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function renderLegend() {
@@ -3219,6 +3529,7 @@ function renderLegend() {
   if (FIND.length && showFind) h += `<span><span class="lb s0">C</span><span class="lb s1">H</span><span class="lb s2">M</span><span class="lb s3">L</span>worst finding</span>`;
   if ([...folderFlags.values()].some((f) => f.bad.length)) h += `<span><span class="lb s0">!</span>individual account on level ${levelText}</span>`;
   if ([...folderFlags.values()].some((f) => f.ext.length)) h += `<span><span class="lb s2">E</span>external access</span>`;
+  if (LA) h += `<span title="${esc(`From ${LA.src}. Share audit ${LA.share ? "since " + LA.share : "not in the store"}, up to ${LA.ref}.`)}"><span class="st idle" style="margin-left:0">unused</span>person with access, no use in ${LA.days} days</span>`;
   $("legend").innerHTML = h;
 }
 
@@ -3458,6 +3769,8 @@ document.addEventListener("click", (e) => {
   if (!b) return;
   if (b.dataset.copy !== undefined) { copyText(b.dataset.copy, b.dataset.what || "text"); return; }
   if (b.dataset.tcopy !== undefined) { copyText(teamsTsv(+b.dataset.tcopy), "teams with access"); return; }
+  if (b.dataset.sec !== undefined) { toggleSection(b.dataset.sec); return; }
+  if (b.dataset.jump !== undefined) { jumpToSection(b.dataset.jump); return; }
   if (b.dataset.team !== undefined) { selectTeam(+b.dataset.team, !b.closest("#details, #idcard")); return; }
   if (b.dataset.loc !== undefined) { selectLoc(+b.dataset.loc); return; }
   if (b.classList.contains("frow")) {
@@ -3475,6 +3788,7 @@ document.addEventListener("click", (e) => {
   else if (b.id === "tclear") selectTeam(-1);
   else if (b.id === "lclear") selectLoc(-1);
   else if (b.id === "tall") { teamsAll = !teamsAll; renderDetails(); }
+  else if (b.id === "uall") { useAll = !useAll; renderDetails(); }
   else if (b.dataset.id !== undefined) selectIdentity(+b.dataset.id);
   else if (b.classList.contains("prow")) selectFolder(+b.dataset.f, true);
   else if (b.id === "idclear") selectIdentity(-1);
@@ -3548,7 +3862,8 @@ window.addEventListener("resize", () => { schedule(); mSchedule(); });
 const m = D.meta;
 $("subtitle").textContent = `${m.root} \u00b7 ${plural(N, "folder", "folders")} \u00b7 ${fmt(m.entries)} entries \u00b7 scan ${m.source}` +
   (m.findingsSource ? ` \u00b7 findings ${m.findingsSource}` : "") + ` \u00b7 generated ${m.generated}` +
-  (M ? ` \u00b7 group members read ${M.at}` : "") + (RD ? ` \u00b7 roles ${RD.src.join(", ")}` : "") + (TD ? ` \u00b7 teams ${TD.src}` : "");
+  (M ? ` \u00b7 group members read ${M.at}` : "") + (RD ? ` \u00b7 roles ${RD.src.join(", ")}` : "") + (TD ? ` \u00b7 teams ${TD.src}` : "") +
+  (LA ? ` \u00b7 last use ${LA.src} up to ${LA.ref}` : "");
 $("idcount").textContent = fmt(idRows.length);
 if (FIND.length) $("findcount").textContent = fmt(FIND.length);
 else { $("findtab").hidden = true; $("findtoggle").hidden = true; }

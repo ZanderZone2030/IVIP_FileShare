@@ -42,6 +42,7 @@ Ask any of these questions and get the answer on the page, with the path that ex
 - Where do **external accounts** (consultants) get access, directly or hidden in nested groups?
 - Which groups are **empty, circular, or contain Domain Users / Everyone**?
 - Which **One Identity roles** assign a misconfigured group?
+- Who has access but **has not used it in 90 days**? (optional, from the file server's audit log)
 
 ## How it works
 
@@ -64,7 +65,9 @@ flowchart LR
 |---|---|---|---|
 | 1. Scan | [`Get-FolderPermissions.ps1`](scripts/Get-FolderPermissions.ps1) | Walks the folder tree and records every access entry: owner, rights, Allow or Deny, inherited or explicit, "applies to", broken inheritance, orphaned SIDs, unreadable folders. | One CSV row per entry per folder |
 | 2. Analyze | [`Find-PermissionIssues.ps1`](scripts/Find-PermissionIssues.ps1) | Runs 18 checks (broad groups with write access, non-admins with Full Control, orphaned SIDs, direct user grants, deny entries...). Each entry is reported once, where it is set, with the number of folders that inherit it. | Findings CSV and an HTML report |
-| 3. Visualize | [`New-PermissionGraph.ps1`](scripts/New-PermissionGraph.ps1) | Builds an interactive graph of the tree. Optionally reads group membership from AD, and overlays One Identity roles and teams. | One self-contained HTML file |
+| 3. Visualize | [`New-PermissionGraph.ps1`](scripts/New-PermissionGraph.ps1) | Builds an interactive graph of the tree. Optionally reads group membership from AD, overlays One Identity roles and teams, and shows each person's last use from a last-access store. | One self-contained HTML file |
+
+**Last use (optional).** Windows does not record when a person last used a folder, so three more scripts read it from the Security log of the file server. [`Get-ShareAccessEvents.ps1`](scripts/Get-ShareAccessEvents.ps1) collects the share and folder audit events daily, [`Merge-LastAccess.ps1`](scripts/Merge-LastAccess.ps1) keeps them in a rolling store, and [`Join-LastAccess.ps1`](scripts/Join-LastAccess.ps1) adds "last used" to any access list CSV. `New-PermissionGraph.ps1 -LastAccessPath` reads the same store. Setup, audit policy and data layout are in **[docs/last-access.md](docs/last-access.md)**.
 
 The details of each step, the data model and the algorithms are in **[docs/how-it-works.md](docs/how-it-works.md)**.
 
@@ -92,6 +95,14 @@ With the One Identity exports (formats in [docs/one-identity.md](docs/one-identi
 .\scripts\New-PermissionGraph.ps1 -Path .\data.csv -FindingsPath .\data_findings.csv -IncludeGroupMembers `
     -BusinessRolePath .\oim_org.csv -SystemRolePath .\oim_eset.csv -TeamPath .\oim_departments.csv `
     -Title "Data share - October review"
+```
+
+With last use from a last-access store (setup in [docs/last-access.md](docs/last-access.md)):
+
+```powershell
+.\scripts\Get-ShareAccessEvents.ps1 -ComputerName FS01 -StorePath \\admin01\ivip\lastaccess -FolderListPath .\data.csv -OutputFolder .\run
+.\scripts\Merge-LastAccess.ps1 -Path .\run -StorePath \\admin01\ivip\lastaccess
+.\scripts\New-PermissionGraph.ps1 -Path .\data.csv -FindingsPath .\data_findings.csv -IncludeGroupMembers -FileServer FS01 -LastAccessPath \\admin01\ivip\lastaccess
 ```
 
 Try it without a share: the [samples](samples/) folder has a synthetic scan and synthetic One Identity exports.
@@ -150,6 +161,12 @@ The full list of checks and flags is in [docs/checks.md](docs/checks.md).
 
 ![Findings report](docs/images/findings-report.png)
 
+### Last use
+
+With `-LastAccessPath`, the folder panel lists the people who can reach the folder and when each one last used it. The evidence is either the folder audit or a connection to the share, and the panel shows which one. People who have not used their access in 90 days (`-UnusedDays`) get a dotted grey **unused** chip. This is only said when the audit log covers that whole period. Otherwise the person is "unknown". The person card, the identity list and the team lists show the same last use. A folder as a whole is never marked unused.
+
+![Folder panel with the people who have access and their last use](docs/images/last-used.png)
+
 ### Copy anything
 
 Right-click a folder, group, account, role or team to copy its name, path, member list, teams with access or people with access. The lists are tab-separated, so they paste straight into Excel. Ctrl+C copies the selected folder's path.
@@ -173,15 +190,18 @@ The outputs are sensitive. The CSV and the HTML contain the full permission map 
 - **NTFS only.** Share permissions also limit network access and are not part of the scan.
 - **Folders, not files.** Permissions set on individual files are not scanned.
 - **Point in time.** Group membership is read when the page is built, not when the folders were scanned.
+- **Last use needs auditing.** It is only known from the day the File Share audit (and, for single folders, a SACL) was switched on. Share connections show that a person used the share, not which folder in it.
 - **Approximate effective access.** Deny entries are shown but not subtracted from team counts. Entries that apply only to subfolders or files are shown on the folder that carries them.
 - **Very large groups.** Members are read up to `-MaxMembersPerGroup` (default 5,000) per group, and the page shows how many were not read.
 
 ## Repository layout
 
 ```
-scripts/   the three scripts
+scripts/   the three scripts, and the three last-use scripts
 samples/   synthetic scan, findings and One Identity exports to try the tools
-docs/      how it works, checks reference, One Identity input formats
+samples/lastaccess/  synthetic last-access runs, store and access list (built by dev/Test-Sample.ps1)
+dev/       builds the last-access samples
+docs/      how it works, checks reference, One Identity input formats, last use
 docs/demo/ the page and findings report built from the samples
 ```
 

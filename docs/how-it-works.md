@@ -92,6 +92,10 @@ Role and team files are matched to groups and accounts by bare name, compared wi
 
 Everything is embedded in the HTML file as one compact JSON block, read by a single script. The page needs no CDN, fonts or network calls. All text is escaped for JavaScript and HTML, so a folder or group name can't break out of the page.
 
+### Last use (`-LastAccessPath`)
+
+The page reads the store written by `Merge-LastAccess.ps1`. It keeps only the file share rows of `-FileServer` (every server when that is not given, with a warning if there is more than one) whose path is inside the scanned tree or holds it. Only the accounts that appear on the page are embedded, with their last use per share and audited folder and the periods the audit covers. The page then works out, for each folder and person, whether there is folder-level evidence that covers `-UnusedDays`, or else share-level evidence, and marks the person Used, Unused or Unknown. See [last-access.md](last-access.md).
+
 ## How the page computes access
 
 ### Highlighting
